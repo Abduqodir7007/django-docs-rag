@@ -2,3 +2,4 @@
 .env
 data/
 extractor.py
+__pycache__/
