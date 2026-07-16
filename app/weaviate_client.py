@@ -17,10 +17,46 @@ llm = genai.Client(api_key=GEMINI_API_KEY)
 
 
 def generate_embedding(text: str) -> list[float]:
-    if not text.strip():
+    stripped_text = text.strip()
+    if not stripped_text:
         return []
-    response = llm.models.embed_content(model="gemini-embedding-2", contents=text)
-    return response.embeddings[0].values
+    response = llm.models.embed_content(model="gemini-embedding-2", contents=stripped_text)
+    embeddings = getattr(response, "embeddings", None) or []
+    if not embeddings:
+        return []
+
+    values = getattr(embeddings[0], "values", None) or []
+    return list(values)
+
+
+def generate_answer(question: str, context: str) -> str:
+    prompt = f"""You are a precise assistant for questions about Django 6.0.
+
+Use only the context below to answer the question. If the context does not contain the answer,
+say that you could not find it in the indexed Django 6.0 documentation.
+
+Context:
+{context}
+
+Question: {question}
+
+Answer in a helpful, concise way."""
+
+    response = llm.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    text = getattr(response, "text", None)
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    candidates = getattr(response, "candidates", None) or []
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        parts = getattr(content, "parts", None) or []
+        for part in parts:
+            part_text = getattr(part, "text", None)
+            if isinstance(part_text, str) and part_text.strip():
+                return part_text.strip()
+
+    raise ValueError("Gemini returned an empty answer.")
 
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[str]:
@@ -113,25 +149,25 @@ def insert_data_into_weaviate(collection):
         save_checkpoint(file)
 
 
-with weaviate.connect_to_local() as client:
-    if client.collections.exists("Topics"):
-        collection = client.collections.get("Topics")
-        print("Collection 'Topics' retrieved successfully.")
-    else:
-        collection = client.collections.create(
-            name="Topics",
-            vector_config=Configure.Vectors.self_provided(),
-            properties=[
-                Property(name="title", data_type=DataType.TEXT, description="The title of the topic"),
-                Property(name="content", data_type=DataType.TEXT, description="The content of the topic"),
-                Property(
-                    name="source_link",
-                    data_type=DataType.TEXT,
-                    description="The source link of the topic",
-                ),
-            ],
-        )
-        print("Collection 'Topics' created successfully.")
-    insert_data_into_weaviate(collection)
-    print("Data inserted into the 'Topics' collection successfully.")
-
+if __name__ == "__main__":
+    with weaviate.connect_to_local() as client:
+        if client.collections.exists("Topics"):
+            collection = client.collections.get("Topics")
+            print("Collection 'Topics' retrieved successfully.")
+        else:
+            collection = client.collections.create(
+                name="Topics",
+                vector_config=Configure.Vectors.self_provided(),
+                properties=[
+                    Property(name="title", data_type=DataType.TEXT, description="The title of the topic"),
+                    Property(name="content", data_type=DataType.TEXT, description="The content of the topic"),
+                    Property(
+                        name="source_link",
+                        data_type=DataType.TEXT,
+                        description="The source link of the topic",
+                    ),
+                ],
+            )
+            print("Collection 'Topics' created successfully.")
+        insert_data_into_weaviate(collection)
+        print("Data inserted into the 'Topics' collection successfully.")

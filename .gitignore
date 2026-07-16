@@ -3,3 +3,5 @@
 data/
 extractor.py
 __pycache__/
+checkpoint.json
+*.pyc
