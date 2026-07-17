@@ -84,7 +84,7 @@ def load_checkpoint() -> Path | None:
     try:
         with CHECKPOINT_FILE.open("r", encoding="utf-8") as file_handle:
             data = json.load(file_handle)
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError):
         return None
 
     last_file = data.get("last_file")
